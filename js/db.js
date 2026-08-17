@@ -1,5 +1,5 @@
 /**
- * db.js - IndexedDB Database Manager for Site Survey Projects
+ * db.js - Hybrid Database Manager (Firebase Cloud Database + IndexedDB Offline Cache)
  */
 const DB_NAME = "SiteSurveyDB_Clean";
 const DB_VERSION = 1;
@@ -7,71 +7,126 @@ const STORE_NAME = "surveys";
 
 class SurveyDB {
   constructor() {
-    this.db = null;
+    this.localDB = null;
+    this.firebaseDB = null;
+    this.isCloudEnabled = false;
+    this.listeners = [];
     this.isReady = this.init();
   }
 
   async init() {
-    if (!window.indexedDB) {
-      console.warn("IndexedDB not supported, using localStorage fallback");
-      return null;
-    }
+    // 1. Initialize local IndexedDB first
+    await this.initLocalDB();
 
-    return new Promise((resolve, reject) => {
+    // 2. Check for Firebase configuration
+    await this.initFirebase();
+
+    return true;
+  }
+
+  async initLocalDB() {
+    if (!window.indexedDB) return null;
+    return new Promise((resolve) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
-
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
           store.createIndex("updatedAt", "updatedAt", { unique: false });
-          store.createIndex("projectName", "fields.projectName", { unique: false });
         }
       };
-
       request.onsuccess = (event) => {
-        this.db = event.target.result;
-        resolve(this.db);
+        this.localDB = event.target.result;
+        resolve(this.localDB);
       };
+      request.onerror = () => resolve(null);
+    });
+  }
 
-      request.onerror = (event) => {
-        console.error("IndexedDB error:", event.target.error);
-        reject(event.target.error);
-      };
+  async initFirebase() {
+    let config = window.FIREBASE_CONFIG;
+
+    // Check if user set custom config in localStorage
+    try {
+      const savedConfig = localStorage.getItem("firebase_custom_config");
+      if (savedConfig) {
+        config = JSON.parse(savedConfig);
+      }
+    } catch(e) {}
+
+    if (config && config.apiKey && config.databaseURL && typeof firebase !== "undefined") {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(config);
+        }
+        this.firebaseDB = firebase.database();
+        this.isCloudEnabled = true;
+        console.log("☁️ Connected to Firebase Cloud Database");
+
+        // Listen for realtime cloud updates
+        this.firebaseDB.ref("surveys").on("value", async (snapshot) => {
+          const cloudData = snapshot.val() || {};
+          const list = Object.values(cloudData);
+          // Sync cloud records into local IndexedDB
+          for (const item of list) {
+            await this._saveLocal(item);
+          }
+          // Notify app listeners
+          this.notifyListeners(list);
+        });
+      } catch (err) {
+        console.warn("Firebase init error:", err);
+      }
+    }
+  }
+
+  onSurveysChanged(callback) {
+    if (typeof callback === "function") {
+      this.listeners.push(callback);
+    }
+  }
+
+  notifyListeners(surveys) {
+    this.listeners.forEach(cb => {
+      try { cb(surveys); } catch(e) {}
     });
   }
 
   async getAll() {
     await this.isReady;
-    if (!this.db) return this._fallbackGetAll();
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
+    // If cloud is enabled and online, fetch from Firebase
+    if (this.isCloudEnabled && navigator.onLine) {
+      try {
+        const snapshot = await this.firebaseDB.ref("surveys").once("value");
+        const val = snapshot.val() || {};
+        const items = Object.values(val);
+        items.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        return items;
+      } catch (err) {
+        console.warn("Cloud read failed, fallback to local:", err);
+      }
+    }
 
-      request.onsuccess = () => {
-        const results = request.result || [];
-        results.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-        resolve(results);
-      };
-
-      request.onerror = () => reject(request.error);
-    });
+    // Otherwise read from local IndexedDB
+    return await this._getAllLocal();
   }
 
   async getById(id) {
     await this.isReady;
-    if (!this.db) return this._fallbackGetById(id);
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.get(id);
+    if (this.isCloudEnabled && navigator.onLine) {
+      try {
+        const snapshot = await this.firebaseDB.ref(`surveys/${id}`).once("value");
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          await this._saveLocal(data);
+          return data;
+        }
+      } catch (err) {}
+    }
 
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
+    return await this._getByIdLocal(id);
   }
 
   async save(survey) {
@@ -84,30 +139,35 @@ class SurveyDB {
     }
     survey.updatedAt = now;
 
-    if (!this.db) return this._fallbackSave(survey);
+    // 1. Save to local cache first
+    await this._saveLocal(survey);
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.put(survey);
+    // 2. Save to Cloud if available
+    if (this.isCloudEnabled) {
+      try {
+        await this.firebaseDB.ref(`surveys/${survey.id}`).set(survey);
+      } catch (err) {
+        console.warn("Cloud save failed, saved locally:", err);
+      }
+    }
 
-      request.onsuccess = () => resolve(survey);
-      request.onerror = () => reject(request.error);
-    });
+    return survey;
   }
 
   async delete(id) {
     await this.isReady;
-    if (!this.db) return this._fallbackDelete(id);
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.delete(id);
+    // Delete locally
+    await this._deleteLocal(id);
 
-      request.onsuccess = () => resolve(true);
-      request.onerror = () => reject(request.error);
-    });
+    // Delete in Cloud
+    if (this.isCloudEnabled) {
+      try {
+        await this.firebaseDB.ref(`surveys/${id}`).remove();
+      } catch (err) {}
+    }
+
+    return true;
   }
 
   async duplicate(id) {
@@ -150,6 +210,55 @@ class SurveyDB {
       }
     }
     return count;
+  }
+
+  // --- Local Storage & IndexedDB Helpers ---
+  async _getAllLocal() {
+    if (!this.localDB) return this._fallbackGetAll();
+    return new Promise((resolve) => {
+      const tx = this.localDB.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const results = req.result || [];
+        results.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        resolve(results);
+      };
+      req.onerror = () => resolve([]);
+    });
+  }
+
+  async _getByIdLocal(id) {
+    if (!this.localDB) return this._fallbackGetById(id);
+    return new Promise((resolve) => {
+      const tx = this.localDB.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  }
+
+  async _saveLocal(survey) {
+    if (!this.localDB) return this._fallbackSave(survey);
+    return new Promise((resolve) => {
+      const tx = this.localDB.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(survey);
+      req.onsuccess = () => resolve(survey);
+      req.onerror = () => resolve(survey);
+    });
+  }
+
+  async _deleteLocal(id) {
+    if (!this.localDB) return this._fallbackDelete(id);
+    return new Promise((resolve) => {
+      const tx = this.localDB.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => resolve(false);
+    });
   }
 
   _fallbackGetAll() {

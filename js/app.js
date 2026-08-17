@@ -34,8 +34,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Load DB and seed sample if empty
   await window.db.isReady;
+  updateCloudIndicator();
+
+  // Listen for realtime cloud updates
+  window.db.onSurveysChanged((cloudSurveys) => {
+    allSurveysCache = cloudSurveys;
+    if (currentMode === "dashboard") {
+      filterDashboard();
+    }
+  });
+
   const existing = await window.db.getAll();
-  if (existing.length === 0 && typeof SAMPLE_SURVEYS !== "undefined") {
+  if (existing.length === 0 && typeof SAMPLE_SURVEYS !== "undefined" && !window.db.isCloudEnabled) {
     for (const s of SAMPLE_SURVEYS) {
       await window.db.save(s);
     }
@@ -48,6 +58,74 @@ document.addEventListener("DOMContentLoaded", async () => {
     setMode("dashboard");
   }
 });
+
+/* ============================================================
+   CLOUD STATUS & CONFIG MODAL
+   ============================================================ */
+function updateCloudIndicator() {
+  const dot = document.getElementById("cloudDot");
+  const text = document.getElementById("cloudText");
+  const btn = document.getElementById("cloudStatusBtn");
+
+  if (window.db && window.db.isCloudEnabled) {
+    if (dot) dot.style.background = "#2f8f5b";
+    if (text) text.textContent = "☁️ เชื่อมต่อ Cloud แล้ว (ซิงค์ทุกเครื่อง)";
+    if (btn) btn.innerHTML = "☁️ Cloud ออนไลน์ ✓";
+  } else {
+    if (dot) dot.style.background = "#9aa3af";
+    if (text) text.textContent = "💻 โหมดบันทึกในเครื่อง";
+    if (btn) btn.innerHTML = "☁️ ตั้งค่า Cloud";
+  }
+}
+
+function openCloudModal() {
+  const input = document.getElementById("firebaseConfigInput");
+  const saved = localStorage.getItem("firebase_custom_config");
+  if (saved) {
+    input.value = saved;
+  } else if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey) {
+    input.value = JSON.stringify(window.FIREBASE_CONFIG, null, 2);
+  }
+  document.getElementById("cloudModal").hidden = false;
+}
+
+function closeCloudModal() {
+  document.getElementById("cloudModal").hidden = true;
+}
+
+function saveFirebaseConfig() {
+  const val = document.getElementById("firebaseConfigInput").value.trim();
+  if (!val) {
+    alert("กรุณาวางโค้ด Firebase Config");
+    return;
+  }
+  try {
+    let cleanJson = val;
+    // Extract JSON if user pasted javascript object
+    if (val.includes("const firebaseConfig =")) {
+      cleanJson = val.replace(/const firebaseConfig\s*=\s*/, "").replace(/;[\s\n]*$/, "");
+    }
+    // Convert unquoted keys to valid JSON if needed
+    const parsed = new Function(`return ${cleanJson}`)();
+    if (!parsed.apiKey || !parsed.databaseURL) {
+      alert("Config ไม่ถูกต้อง ต้องมี apiKey และ databaseURL");
+      return;
+    }
+
+    localStorage.setItem("firebase_custom_config", JSON.stringify(parsed));
+    showToast("บันทึกการตั้งค่า Cloud เรียบร้อย! กำลังรีโหลดระบบ...");
+    setTimeout(() => window.location.reload(), 800);
+  } catch (err) {
+    alert("รูปแบบ Config ไม่ถูกต้อง: " + err.message);
+  }
+}
+
+function clearFirebaseConfig() {
+  if (!confirm("ต้องการยกเลิกการเชื่อมต่อ Cloud กลับมาใช้โหมดในเครื่องใช่หรือไม่?")) return;
+  localStorage.removeItem("firebase_custom_config");
+  showToast("ยกเลิกการเชื่อมต่อ Cloud แล้ว");
+  setTimeout(() => window.location.reload(), 500);
+}
 
 /* ============================================================
    BUILD PILLS
