@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <title>Site Survey &amp; Project Requirement Management</title>
+  <meta name="description" content="ระบบบันทึกและจัดการข้อมูลสำรวจหน้างาน AV/IT & Project Requirement">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ================= TOPBAR ================= -->
+  <header class="topbar">
+    <div class="brandmark" onclick="setMode('dashboard')" title="กลับหน้าแรก">
+      <b>📋 Site Survey &amp; Project Management</b>
+      <span>ระบบจัดการและบันทึกข้อมูลสำรวจหน้างานออนไลน์</span>
+    </div>
+
+    <!-- View Switcher Tabs -->
+    <div class="seg">
+      <button id="tabDashboard" class="active" onclick="setMode('dashboard')">📋 รายการโครงการ</button>
+      <button id="tabEdit" onclick="setMode('edit')">✏️ แบบฟอร์ม</button>
+      <button id="tabPreview" onclick="setMode('preview')">👁 พรีวิวเอกสาร</button>
+    </div>
+
+    <!-- Mode Actions -->
+    <div class="topbar-actions">
+      <!-- Dashboard actions -->
+      <button class="btn primary dash-only" onclick="createNewSurvey()">+ สร้างแบบสำรวจใหม่</button>
+      <button class="btn ghost-light dash-only" onclick="openBackupModal()">🔄 สำรอง/นำเข้าข้อมูล</button>
+
+      <!-- Edit / Preview actions -->
+      <button class="btn success edit-preview-only" hidden onclick="saveCurrentSurvey(true)">💾 บันทึกข้อมูล</button>
+      <button class="btn primary edit-preview-only" hidden onclick="exportPDF()">🖨 Export PDF</button>
+      <button class="btn edit-preview-only" hidden onclick="downloadReport()">📄 ดาวน์โหลด HTML</button>
+      <button class="btn ghost-light edit-preview-only" hidden onclick="downloadCurrentDraftJSON()">📥 บันทึก JSON</button>
+      <button class="btn ghost-light edit-preview-only" hidden onclick="setMode('dashboard')">⬅ กลับหน้ารายการ</button>
+    </div>
+  </header>
+
+  <!-- ================= 1. DASHBOARD VIEW (Project List) ================= -->
+  <main id="dashboardView" class="dashboard-wrap">
+    <div class="dash-header">
+      <div class="dash-title">
+        <h1>รายการโครงการสำรวจหน้างาน</h1>
+        <p>เลือกเปิดดูรายละเอียด แก้ไขต่อ หรือพิมพ์รายงานโครงการได้ทันที</p>
+      </div>
+      <button class="btn primary" onclick="createNewSurvey()">+ สร้างแบบสำรวจใหม่</button>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="dash-toolbar">
+      <div class="search-box">
+        <input type="text" id="dashSearch" placeholder="พิมพ์ค้นหาชื่อโครงการ, ชื่อลูกค้า, สถานที่..." oninput="filterDashboard()">
+      </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="table-card">
+      <div style="overflow-x:auto;">
+        <table class="project-table">
+          <thead>
+            <tr>
+              <th style="width:55%;">ชื่องาน / ลูกค้า / สถานที่</th>
+              <th style="width:20%;">แก้ไขล่าสุด</th>
+              <th style="width:25%; text-align:right;">การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="projectsList"></tbody>
+        </table>
+      </div>
+
+      <!-- Empty state -->
+      <div id="emptyDashboard" class="empty-dash" hidden>
+        <div class="empty-icon">📁</div>
+        <h3>ไม่พบโครงการที่ค้นหา</h3>
+        <p>ยังไม่มีแบบสำรวจ หรือไม่พบข้อมูลที่ตรงกับคำค้นหาของคุณ</p>
+        <button class="btn primary" onclick="createNewSurvey()">+ สร้างแบบสำรวจโครงการใหม่</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= 2. EDIT FORM VIEW ================= -->
+  <main class="sheet" id="editView" hidden>
+
+    <div class="title-block">
+      <h1>Site Survey &amp; Project Requirement Form</h1>
+      <p>กรอกรายละเอียดโครงการและข้อมูลหน้างานให้ครบถ้วน ข้อมูลจะบันทึกอัตโนมัติ</p>
+      <div class="tb-grid">
+        <div class="tb-cell"><label>Project Name</label><input type="text" name="projectName" placeholder="ชื่อโครงการ"></div>
+        <div class="tb-cell"><label>Customer</label><input type="text" name="customer" placeholder="ชื่อลูกค้า"></div>
+        <div class="tb-cell"><label>Sales Owner</label><input type="text" name="salesOwner"></div>
+        <div class="tb-cell"><label>Engineering Owner</label><input type="text" name="engineeringOwner"></div>
+        <div class="tb-cell"><label>Survey Date</label><input type="date" name="surveyDate"></div>
+        <div class="tb-cell"><label>Proposal Due Date</label><input type="date" name="proposalDueDate"></div>
+        <div class="tb-cell"><label>Site Location</label><input type="text" name="siteLocation"></div>
+        <div class="tb-cell"><label>Project Type</label><input type="text" name="projectType"></div>
+      </div>
+    </div>
+
+    <!-- 1. Project Classification -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">1</div><h2>Project Classification</h2></div>
+      <div class="card-body">
+        <div class="pillgroup" id="grp-classification"></div>
+        <hr class="rule">
+        <div class="grid2">
+          <div class="field"><label class="flabel">Audio Channels</label><input type="text" name="audioChannels" placeholder="เช่น 2.0, 5.1, 8 zones"></div>
+          <div class="field"><label class="flabel">Other</label><input type="text" name="classificationOther" placeholder="ระบุประเภทอื่น ๆ"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Budget & Business Requirement -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">2</div><h2>Budget &amp; Business Requirement</h2></div>
+      <div class="card-body">
+        <div class="grid2">
+          <div class="field"><label class="flabel">Budget Range</label><input type="text" name="budgetRange" placeholder="เช่น 500,000 - 800,000 บาท"></div>
+          <div class="field"><label class="flabel">Required Lead Time</label><input type="text" name="leadTime" placeholder="เช่น 6 สัปดาห์"></div>
+        </div>
+        <div class="field"><label class="flabel">Priority</label>
+          <div class="pillgroup" id="grp-priority"></div>
+        </div>
+        <div class="field"><label class="flabel">System Grade</label>
+          <div class="pillgroup" id="grp-systemGrade"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label class="flabel">Preferred Brand</label><input type="text" name="preferredBrand"></div>
+          <div class="field"><label class="flabel">Brand Preference (Notes)</label><input type="text" name="brandPreference"></div>
+        </div>
+        <div class="field"><label class="flabel">Warranty</label>
+          <div class="pillgroup" id="grp-warranty"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Site Information -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">3</div><h2>Site Information</h2></div>
+      <div class="card-body">
+        <div class="grid5">
+          <div class="field"><label class="flabel">Width (m.)</label><input type="number" step="0.1" name="width"></div>
+          <div class="field"><label class="flabel">Length (m.)</label><input type="number" step="0.1" name="length"></div>
+          <div class="field"><label class="flabel">Height (m.)</label><input type="number" step="0.1" name="height"></div>
+          <div class="field"><label class="flabel">Capacity (Seats)</label><input type="number" name="capacity"></div>
+          <div class="field"><label class="flabel">Viewing Distance</label><input type="text" name="viewingDistance"></div>
+        </div>
+        <div class="grid3" style="margin-top:.2rem;">
+          <div class="field"><label class="flabel">Ceiling Type</label><input type="text" name="ceilingType"></div>
+          <div class="field"><label class="flabel">Floor Type</label><input type="text" name="floorType"></div>
+          <div class="field"><label class="flabel">Wall Material</label><input type="text" name="wallMaterial"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label class="flabel">Power Available</label>
+            <div class="pillgroup" id="grp-powerAvailable"></div>
+          </div>
+          <div class="field"><label class="flabel">Network Available</label>
+            <div class="pillgroup" id="grp-networkAvailable"></div>
+          </div>
+        </div>
+        <div class="field"><label class="flabel">Additional Information</label><textarea name="additionalInfo" placeholder="เช่น ห้องมีเสียงสะท้อน"></textarea></div>
+        <div class="field"><label class="flabel">Site Constraints</label><textarea name="siteConstraints"></textarea></div>
+
+        <hr class="rule">
+        <div class="field">
+          <label class="flabel">Reference Drawings / Photos Attached <span class="sub">— แตะเพื่อเลือกรูป หรือถ่ายรูปหน้างานได้ทันที</span></label>
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+            <b>📷 แตะเพื่อเพิ่มรูปภาพหน้างาน</b>
+            รองรับหลายรูป • ระบบจะย่อขนาดให้อัตโนมัติ • ลากไฟล์มาวางได้เช่นกัน
+          </div>
+          <input type="file" id="fileInput" accept="image/*" multiple hidden onchange="handleFiles(this.files)">
+          <div class="gallery" id="gallery"></div>
+          <div class="gallery-empty" id="galleryEmpty">ยังไม่มีรูปภาพแนบ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Technical Requirement -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">4</div><h2>Technical Requirement</h2></div>
+      <div class="card-body">
+        <table class="tech">
+          <thead><tr><th style="width:30%">Requirement</th><th style="width:32%">Use Case</th><th style="width:32%">Existing Equipment</th><th></th></tr></thead>
+          <tbody id="techBody"></tbody>
+        </table>
+        <button type="button" class="add-row-btn" onclick="addTechRow()">+ เพิ่มแถว</button>
+      </div>
+    </div>
+
+    <!-- 5. Scope of Work -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">5</div><h2>Scope of Work</h2></div>
+      <div class="card-body">
+        <div class="pillgroup" id="grp-scope"></div>
+        <div class="field" style="margin-top:.8rem;"><label class="flabel">Conference Type</label>
+          <div class="pillgroup" id="grp-conference"></div>
+        </div>
+        <div class="field"><label class="flabel">Other Scope</label><input type="text" name="scopeOther"></div>
+      </div>
+    </div>
+
+    <!-- 6. Design Deliverables -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">6</div><h2>Design Deliverables</h2></div>
+      <div class="card-body">
+        <div class="pillgroup" id="grp-deliverables"></div>
+      </div>
+    </div>
+
+    <!-- 7. Site Constraint & Risk -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">7</div><h2>Site Constraint &amp; Risk</h2></div>
+      <div class="card-body">
+        <div class="field"><label class="flabel">Site Risk / Limitation / Special Requirement</label><textarea name="siteRisk" style="min-height:110px;"></textarea></div>
+      </div>
+    </div>
+
+    <!-- 8. Approval -->
+    <div class="card">
+      <div class="card-head"><div class="tag-num">8</div><h2>Approval</h2></div>
+      <div class="card-body">
+        <div class="grid3">
+          <div class="field"><label class="flabel">Prepared By</label><input type="text" name="preparedBy"><input type="date" name="preparedDate" style="margin-top:.4rem;"></div>
+          <div class="field"><label class="flabel">Reviewed By</label><input type="text" name="reviewedBy"><input type="date" name="reviewedDate" style="margin-top:.4rem;"></div>
+          <div class="field"><label class="flabel">Approved By</label><input type="text" name="approvedBy"><input type="date" name="approvedDate" style="margin-top:.4rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; margin-top:1.5rem; flex-wrap:wrap; gap:1rem;">
+      <button type="button" class="btn outline-dark" onclick="setMode('dashboard')">⬅ กลับหน้ารายการ</button>
+      <div style="display:flex; gap:.6rem;">
+        <button type="button" class="btn success" onclick="saveCurrentSurvey(true)">💾 บันทึกข้อมูล</button>
+        <button type="button" class="btn primary" onclick="exportPDF()">🖨 Export PDF</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= 3. PREVIEW VIEW ================= -->
+  <main class="sheet" id="previewView" hidden>
+    <div class="doc" id="docOutput"></div>
+  </main>
+
+  <!-- ================= LIGHTBOX ================= -->
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lb-close" onclick="closeLightbox()" title="ปิด">✕</button>
+    <button class="lb-nav lb-prev" onclick="navLightbox(-1)" title="ก่อนหน้า">‹</button>
+    <img id="lbImg" src="" alt="Zoomed image">
+    <div class="lb-cap" id="lbCap"></div>
+    <button class="lb-nav lb-next" onclick="navLightbox(1)" title="ถัดไป">›</button>
+  </div>
+
+  <!-- ================= BACKUP / RESTORE MODAL ================= -->
+  <div class="modal-overlay" id="backupModal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3>🔄 สำรองข้อมูล &amp; ถ่ายโอนข้อมูล</h3>
+        <button class="icon-del" onclick="closeBackupModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>คุณสามารถดาวน์โหลดข้อมูลโครงการทั้งหมดไปเก็บไว้เป็นไฟล์สำรอง (Backup) หรือนำเข้าข้อมูลจากเครื่องอื่นได้ที่นี่:</p>
+        <div style="display:flex; flex-direction:column; gap:.8rem; margin-top:1rem;">
+          <button class="btn primary" onclick="exportAllData()">📤 ดาวน์โหลดไฟล์สำรองข้อมูลทั้งหมด (.json)</button>
+          <button class="btn outline-dark" onclick="triggerImportAll()">📥 นำเข้าข้อมูลสำรอง (.json)</button>
+          <input type="file" id="importFileInput" accept="application/json" hidden onchange="handleImportAll(event)">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn outline-dark" onclick="closeBackupModal()">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="statusToast">บันทึกสำเร็จ</div>
+
+  <!-- Application Scripts -->
+  <script src="js/sample-data.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
