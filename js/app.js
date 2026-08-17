@@ -133,6 +133,19 @@ function clearFirebaseConfig() {
   setTimeout(() => window.location.reload(), 500);
 }
 
+function toggleDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById("moreMenu");
+  if (menu) menu.hidden = !menu.hidden;
+}
+
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("moreMenu");
+  if (menu && !e.target.closest(".dropdown")) {
+    menu.hidden = true;
+  }
+});
+
 /* ============================================================
    BUILD PILLS
    ============================================================ */

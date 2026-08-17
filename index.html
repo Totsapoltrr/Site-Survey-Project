@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-  <title>Site Survey &amp; Project Requirement Management</title>
-  <meta name="description" content="AV/IT & Engineering Site Survey and Project Requirement Management System">
+  <title>SiteSurvey</title>
+  <meta name="description" content="Site Survey &amp; Project Requirement Management System">
   <link rel="stylesheet" href="css/style.css">
 
   <!-- Firebase Realtime Database SDK -->
@@ -15,35 +15,41 @@
 
   <!-- ================= TOPBAR ================= -->
   <header class="topbar">
-    <div class="brandmark" onclick="setMode('dashboard')" title="Back to Dashboard">
-      <b>📋 Site Survey &amp; Project Management</b>
-      <span>AV / IT &amp; Engineering Requirement System</span>
+    <div class="brandmark" onclick="setMode('dashboard')" title="Back to Projects">
+      <b>📋 SiteSurvey</b>
     </div>
 
     <!-- View Switcher Tabs -->
     <div class="seg">
-      <button id="tabDashboard" class="active" onclick="setMode('dashboard')">📋 Projects</button>
-      <button id="tabEdit" onclick="setMode('edit')">✏️ Survey Form</button>
-      <button id="tabPreview" onclick="setMode('preview')">👁 Preview</button>
+      <button id="tabDashboard" class="active" onclick="setMode('dashboard')">Projects</button>
+      <button id="tabEdit" onclick="setMode('edit')">Form</button>
+      <button id="tabPreview" onclick="setMode('preview')">Preview</button>
     </div>
 
     <!-- Mode Actions -->
     <div class="topbar-actions">
-      <!-- Dashboard actions -->
-      <button class="btn primary dash-only" onclick="createNewSurvey()">+ New Survey</button>
-      <button class="btn outline-dark dash-only" onclick="openBackupModal()">🔄 Backup / Import</button>
+      <!-- List view action -->
+      <button class="btn primary dash-only" onclick="createNewSurvey()">+ New</button>
 
-      <!-- Edit / Preview actions -->
+      <!-- Edit & Preview actions (Strictly hidden when in List view) -->
       <button class="btn success edit-preview-only" hidden onclick="saveCurrentSurvey(true)">💾 Save</button>
-      <button class="btn primary edit-preview-only" hidden onclick="exportPDF()">🖨 Export PDF</button>
-      <button class="btn outline-dark edit-preview-only" hidden onclick="downloadReport()">📄 Download HTML</button>
-      <button class="btn ghost-light edit-preview-only" hidden onclick="downloadCurrentDraftJSON()">📥 Save JSON</button>
-      <button class="btn ghost-light edit-preview-only" hidden onclick="setMode('dashboard')">⬅ Back to List</button>
+      <button class="btn primary edit-preview-only" hidden onclick="exportPDF()">🖨 PDF</button>
+      <button class="btn outline-dark edit-preview-only" hidden onclick="setMode('dashboard')">⬅ List</button>
 
-      <!-- Clean Cloud Status Icon -->
-      <button class="cloud-icon-btn" id="cloudStatusBtn" onclick="openCloudModal()" title="Cloud Database Settings">
+      <!-- More Actions Dropdown (Clean & Uncluttered) -->
+      <div class="dropdown">
+        <button class="btn outline-dark" onclick="toggleDropdown(event)" title="More options">•••</button>
+        <div class="dropdown-menu" id="moreMenu" hidden>
+          <button class="dropdown-item edit-preview-only" hidden onclick="downloadReport()">📄 Download HTML</button>
+          <button class="dropdown-item edit-preview-only" hidden onclick="downloadCurrentDraftJSON()">📥 Save JSON</button>
+          <button class="dropdown-item" onclick="openBackupModal()">🔄 Backup / Import</button>
+          <button class="dropdown-item" onclick="openCloudModal()">☁️ Cloud Settings</button>
+        </div>
+      </div>
+
+      <!-- Cloud Status Icon -->
+      <button class="cloud-icon-btn" id="cloudStatusBtn" onclick="openCloudModal()" title="Cloud Status">
         <span class="cloud-dot" id="cloudDot"></span>
-        <span>☁️</span>
       </button>
     </div>
   </header>
@@ -52,8 +58,8 @@
   <main id="dashboardView" class="dashboard-wrap">
     <div class="dash-header">
       <div class="dash-title">
-        <h1>Site Survey Projects</h1>
-        <p>Review, edit, duplicate, and export site survey reports</p>
+        <h1>Projects</h1>
+        <p>Manage, review, edit, and export survey reports</p>
       </div>
       <button class="btn primary" onclick="createNewSurvey()">+ New Survey</button>
     </div>
@@ -61,7 +67,8 @@
     <!-- Search Bar -->
     <div class="dash-toolbar">
       <div class="search-box">
-        <input type="text" id="dashSearch" placeholder="Search by project name, client, location..." oninput="filterDashboard()">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="dashSearch" placeholder="Search project name, client, location..." oninput="filterDashboard()">
       </div>
     </div>
 
