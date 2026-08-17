@@ -171,8 +171,24 @@ function buildAllPills() {
 }
 
 /* ============================================================
-   VIEW MANAGEMENT
+   VIEW MANAGEMENT & TAB HANDLING
    ============================================================ */
+function handleFormTabClick() {
+  if (currentMode === "dashboard" && !currentSurveyId) {
+    createNewSurvey();
+  } else {
+    setMode("edit");
+  }
+}
+
+function handlePreviewTabClick() {
+  if (currentMode === "dashboard" && !currentSurveyId) {
+    openExportPickerModal();
+  } else {
+    setMode("preview");
+  }
+}
+
 function setMode(mode) {
   currentMode = mode;
   const isDash = mode === "dashboard";
@@ -187,7 +203,9 @@ function setMode(mode) {
   document.getElementById("tabEdit").classList.toggle("active", isEdit);
   document.getElementById("tabPreview").classList.toggle("active", isPrev);
 
+  // Scoped action visibility
   document.querySelectorAll(".dash-only").forEach(el => el.hidden = !isDash);
+  document.querySelectorAll(".edit-only").forEach(el => el.hidden = !isEdit);
   document.querySelectorAll(".edit-preview-only").forEach(el => el.hidden = isDash);
 
   if (isDash) {
@@ -310,6 +328,64 @@ async function deleteSurvey(id) {
   await window.db.delete(id);
   showToast("Survey deleted");
   await renderDashboard();
+}
+
+/* ============================================================
+   EXPORT PROJECT PICKER MODAL
+   ============================================================ */
+async function openExportPickerModal() {
+  allSurveysCache = await window.db.getAll();
+  document.getElementById("exportPickerModal").hidden = false;
+  filterExportPicker();
+}
+
+function closeExportPickerModal() {
+  document.getElementById("exportPickerModal").hidden = true;
+}
+
+function filterExportPicker() {
+  const query = (document.getElementById("exportPickerSearch").value || "").toLowerCase().trim();
+  const container = document.getElementById("exportPickerList");
+
+  let list = allSurveysCache;
+  if (query) {
+    list = list.filter(s => {
+      const pName = (s.fields?.projectName || "").toLowerCase();
+      const cust = (s.fields?.customer || "").toLowerCase();
+      return pName.includes(query) || cust.includes(query);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--ink-soft); font-size:.85rem;">No projects found to export</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(s => {
+    const f = s.fields || {};
+    const surveyDate = f.surveyDate ? fmtDate(f.surveyDate) : "—";
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:.65rem .8rem; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <div style="overflow:hidden; padding-right:.5rem;">
+          <b style="font-size:.88rem; color:var(--brand-dark); display:block; text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">${escHtml(f.projectName || "Untitled Project")}</b>
+          <span style="font-size:.76rem; color:var(--ink-soft);">🏢 ${escHtml(f.customer || "Unspecified Client")} • 📅 ${surveyDate}</span>
+        </div>
+        <div style="display:flex; gap:.35rem; flex:none;">
+          <button class="btn small primary" onclick="exportProjectById('${s.id}', 'pdf')">🖨 Export PDF</button>
+          <button class="btn small outline-dark" onclick="exportProjectById('${s.id}', 'preview')">👁 Preview</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function exportProjectById(id, action) {
+  closeExportPickerModal();
+  if (action === "pdf") {
+    await printSurvey(id);
+  } else {
+    await previewSurvey(id);
+  }
 }
 
 /* ============================================================
@@ -658,6 +734,10 @@ function buildDocHTML(d) {
    EXPORT & DOWNLOAD
    ============================================================ */
 function exportPDF() {
+  if (currentMode === "dashboard") {
+    openExportPickerModal();
+    return;
+  }
   const data = collectData();
   document.getElementById("docOutput").innerHTML = buildDocHTML(data);
   setMode("preview");
@@ -665,6 +745,10 @@ function exportPDF() {
 }
 
 function downloadReport() {
+  if (currentMode === "dashboard") {
+    openExportPickerModal();
+    return;
+  }
   const data = collectData();
   const inner = buildDocHTML(data);
   const projectName = (data.fields.projectName || "site-survey").trim().replace(/[^a-zA-Z0-9_-]+/g, "_") || "site-survey";
@@ -696,6 +780,10 @@ function downloadReport() {
 }
 
 function downloadCurrentDraftJSON() {
+  if (currentMode === "dashboard") {
+    openBackupModal();
+    return;
+  }
   const data = collectData();
   const name = (data.fields.projectName || "draft").trim().replace(/[^a-zA-Z0-9_-]+/g, "_") || "draft";
   downloadBlob(JSON.stringify(data, null, 2), `${name}_draft.json`, "application/json");
