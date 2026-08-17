@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
   <title>Site Survey &amp; Project Requirement Management</title>
-  <meta name="description" content="ระบบบันทึกและจัดการข้อมูลสำรวจหน้างาน AV/IT & Project Requirement">
+  <meta name="description" content="AV/IT & Engineering Site Survey and Project Requirement Management System">
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- Firebase Realtime Database SDK (Official CDN) -->
+  <!-- Firebase Realtime Database SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
@@ -15,31 +15,36 @@
 
   <!-- ================= TOPBAR ================= -->
   <header class="topbar">
-    <div class="brandmark" onclick="setMode('dashboard')" title="กลับหน้าแรก">
+    <div class="brandmark" onclick="setMode('dashboard')" title="Back to Dashboard">
       <b>📋 Site Survey &amp; Project Management</b>
-      <span>ระบบจัดการและบันทึกข้อมูลสำรวจหน้างานออนไลน์</span>
+      <span>AV / IT &amp; Engineering Requirement System</span>
     </div>
 
     <!-- View Switcher Tabs -->
     <div class="seg">
-      <button id="tabDashboard" class="active" onclick="setMode('dashboard')">📋 รายการโครงการ</button>
-      <button id="tabEdit" onclick="setMode('edit')">✏️ แบบฟอร์ม</button>
-      <button id="tabPreview" onclick="setMode('preview')">👁 พรีวิวเอกสาร</button>
+      <button id="tabDashboard" class="active" onclick="setMode('dashboard')">📋 Projects</button>
+      <button id="tabEdit" onclick="setMode('edit')">✏️ Survey Form</button>
+      <button id="tabPreview" onclick="setMode('preview')">👁 Preview</button>
     </div>
 
     <!-- Mode Actions -->
     <div class="topbar-actions">
       <!-- Dashboard actions -->
-      <button class="btn primary dash-only" onclick="createNewSurvey()">+ สร้างแบบสำรวจใหม่</button>
-      <button class="btn ghost-light dash-only" onclick="openCloudModal()" id="cloudStatusBtn">☁️ ตั้งค่า Cloud</button>
-      <button class="btn ghost-light dash-only" onclick="openBackupModal()">🔄 สำรอง/นำเข้า</button>
+      <button class="btn primary dash-only" onclick="createNewSurvey()">+ New Survey</button>
+      <button class="btn outline-dark dash-only" onclick="openBackupModal()">🔄 Backup / Import</button>
 
       <!-- Edit / Preview actions -->
-      <button class="btn success edit-preview-only" hidden onclick="saveCurrentSurvey(true)">💾 บันทึกข้อมูล</button>
+      <button class="btn success edit-preview-only" hidden onclick="saveCurrentSurvey(true)">💾 Save</button>
       <button class="btn primary edit-preview-only" hidden onclick="exportPDF()">🖨 Export PDF</button>
-      <button class="btn edit-preview-only" hidden onclick="downloadReport()">📄 ดาวน์โหลด HTML</button>
-      <button class="btn ghost-light edit-preview-only" hidden onclick="downloadCurrentDraftJSON()">📥 บันทึก JSON</button>
-      <button class="btn ghost-light edit-preview-only" hidden onclick="setMode('dashboard')">⬅ กลับหน้ารายการ</button>
+      <button class="btn outline-dark edit-preview-only" hidden onclick="downloadReport()">📄 Download HTML</button>
+      <button class="btn ghost-light edit-preview-only" hidden onclick="downloadCurrentDraftJSON()">📥 Save JSON</button>
+      <button class="btn ghost-light edit-preview-only" hidden onclick="setMode('dashboard')">⬅ Back to List</button>
+
+      <!-- Clean Cloud Status Icon -->
+      <button class="cloud-icon-btn" id="cloudStatusBtn" onclick="openCloudModal()" title="Cloud Database Settings">
+        <span class="cloud-dot" id="cloudDot"></span>
+        <span>☁️</span>
+      </button>
     </div>
   </header>
 
@@ -47,20 +52,16 @@
   <main id="dashboardView" class="dashboard-wrap">
     <div class="dash-header">
       <div class="dash-title">
-        <h1>รายการโครงการสำรวจหน้างาน</h1>
-        <p>เลือกเปิดดูรายละเอียด แก้ไขต่อ หรือพิมพ์รายงานโครงการได้ทันที</p>
+        <h1>Site Survey Projects</h1>
+        <p>Review, edit, duplicate, and export site survey reports</p>
       </div>
-      <button class="btn primary" onclick="createNewSurvey()">+ สร้างแบบสำรวจใหม่</button>
+      <button class="btn primary" onclick="createNewSurvey()">+ New Survey</button>
     </div>
 
     <!-- Search Bar -->
     <div class="dash-toolbar">
       <div class="search-box">
-        <input type="text" id="dashSearch" placeholder="พิมพ์ค้นหาชื่อโครงการ, ชื่อลูกค้า, สถานที่..." oninput="filterDashboard()">
-      </div>
-      <div id="cloudIndicator" style="font-size:.78rem; color:var(--ink-soft); display:flex; align-items:center; gap:.35rem;">
-        <span id="cloudDot" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#9aa3af;"></span>
-        <span id="cloudText">โหมดบันทึกในเครื่อง</span>
+        <input type="text" id="dashSearch" placeholder="Search by project name, client, location..." oninput="filterDashboard()">
       </div>
     </div>
 
@@ -70,9 +71,9 @@
         <table class="project-table">
           <thead>
             <tr>
-              <th style="width:55%;">ชื่องาน / ลูกค้า / สถานที่</th>
-              <th style="width:20%;">แก้ไขล่าสุด</th>
-              <th style="width:25%; text-align:right;">การจัดการ</th>
+              <th style="width:55%;">Project / Client / Location</th>
+              <th style="width:20%;">Last Modified</th>
+              <th style="width:25%; text-align:right;">Actions</th>
             </tr>
           </thead>
           <tbody id="projectsList"></tbody>
@@ -82,9 +83,9 @@
       <!-- Empty state -->
       <div id="emptyDashboard" class="empty-dash" hidden>
         <div class="empty-icon">📁</div>
-        <h3>ไม่พบโครงการที่ค้นหา</h3>
-        <p>ยังไม่มีแบบสำรวจ หรือไม่พบข้อมูลที่ตรงกับคำค้นหาของคุณ</p>
-        <button class="btn primary" onclick="createNewSurvey()">+ สร้างแบบสำรวจโครงการใหม่</button>
+        <h3>No projects found</h3>
+        <p>There are no site surveys matching your search query.</p>
+        <button class="btn primary" onclick="createNewSurvey()">+ Create New Survey</button>
       </div>
     </div>
   </main>
@@ -94,10 +95,10 @@
 
     <div class="title-block">
       <h1>Site Survey &amp; Project Requirement Form</h1>
-      <p>กรอกรายละเอียดโครงการและข้อมูลหน้างานให้ครบถ้วน ข้อมูลจะบันทึกอัตโนมัติ</p>
+      <p>Complete project details and site specifications. Changes are automatically saved.</p>
       <div class="tb-grid">
-        <div class="tb-cell"><label>Project Name</label><input type="text" name="projectName" placeholder="ชื่อโครงการ"></div>
-        <div class="tb-cell"><label>Customer</label><input type="text" name="customer" placeholder="ชื่อลูกค้า"></div>
+        <div class="tb-cell"><label>Project Name</label><input type="text" name="projectName" placeholder="Project Name"></div>
+        <div class="tb-cell"><label>Customer / Client</label><input type="text" name="customer" placeholder="Client Name"></div>
         <div class="tb-cell"><label>Sales Owner</label><input type="text" name="salesOwner"></div>
         <div class="tb-cell"><label>Engineering Owner</label><input type="text" name="engineeringOwner"></div>
         <div class="tb-cell"><label>Survey Date</label><input type="date" name="surveyDate"></div>
@@ -114,8 +115,8 @@
         <div class="pillgroup" id="grp-classification"></div>
         <hr class="rule">
         <div class="grid2">
-          <div class="field"><label class="flabel">Audio Channels</label><input type="text" name="audioChannels" placeholder="เช่น 2.0, 5.1, 8 zones"></div>
-          <div class="field"><label class="flabel">Other</label><input type="text" name="classificationOther" placeholder="ระบุประเภทอื่น ๆ"></div>
+          <div class="field"><label class="flabel">Audio Channels</label><input type="text" name="audioChannels" placeholder="e.g. 2.0, 5.1, 8 Zones"></div>
+          <div class="field"><label class="flabel">Other Classification</label><input type="text" name="classificationOther" placeholder="Specify custom room or system type"></div>
         </div>
       </div>
     </div>
@@ -125,8 +126,8 @@
       <div class="card-head"><div class="tag-num">2</div><h2>Budget &amp; Business Requirement</h2></div>
       <div class="card-body">
         <div class="grid2">
-          <div class="field"><label class="flabel">Budget Range</label><input type="text" name="budgetRange" placeholder="เช่น 500,000 - 800,000 บาท"></div>
-          <div class="field"><label class="flabel">Required Lead Time</label><input type="text" name="leadTime" placeholder="เช่น 6 สัปดาห์"></div>
+          <div class="field"><label class="flabel">Budget Range</label><input type="text" name="budgetRange" placeholder="e.g. $50,000 - $80,000"></div>
+          <div class="field"><label class="flabel">Required Lead Time</label><input type="text" name="leadTime" placeholder="e.g. 6 Weeks"></div>
         </div>
         <div class="field"><label class="flabel">Priority</label>
           <div class="pillgroup" id="grp-priority"></div>
@@ -168,19 +169,19 @@
             <div class="pillgroup" id="grp-networkAvailable"></div>
           </div>
         </div>
-        <div class="field"><label class="flabel">Additional Information</label><textarea name="additionalInfo" placeholder="เช่น ห้องมีเสียงสะท้อน"></textarea></div>
+        <div class="field"><label class="flabel">Additional Information</label><textarea name="additionalInfo" placeholder="e.g. Acoustic reflections, direct sunlight..."></textarea></div>
         <div class="field"><label class="flabel">Site Constraints</label><textarea name="siteConstraints"></textarea></div>
 
         <hr class="rule">
         <div class="field">
-          <label class="flabel">Reference Drawings / Photos Attached <span class="sub">— แตะเพื่อเลือกรูป หรือถ่ายรูปหน้างานได้ทันที</span></label>
+          <label class="flabel">Reference Drawings / Photos Attached <span class="sub">— Tap to upload or take site photos</span></label>
           <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
-            <b>📷 แตะเพื่อเพิ่มรูปภาพหน้างาน</b>
-            รองรับหลายรูป • ระบบจะย่อขนาดให้อัตโนมัติ • ลากไฟล์มาวางได้เช่นกัน
+            <b>📷 Tap to Add Site Photos</b>
+            Supports multiple files • Automatic image compression • Drag &amp; drop supported
           </div>
           <input type="file" id="fileInput" accept="image/*" multiple hidden onchange="handleFiles(this.files)">
           <div class="gallery" id="gallery"></div>
-          <div class="gallery-empty" id="galleryEmpty">ยังไม่มีรูปภาพแนบ</div>
+          <div class="gallery-empty" id="galleryEmpty">No photos attached</div>
         </div>
       </div>
     </div>
@@ -193,7 +194,7 @@
           <thead><tr><th style="width:30%">Requirement</th><th style="width:32%">Use Case</th><th style="width:32%">Existing Equipment</th><th></th></tr></thead>
           <tbody id="techBody"></tbody>
         </table>
-        <button type="button" class="add-row-btn" onclick="addTechRow()">+ เพิ่มแถว</button>
+        <button type="button" class="add-row-btn" onclick="addTechRow()">+ Add Row</button>
       </div>
     </div>
 
@@ -238,9 +239,9 @@
     </div>
 
     <div style="display:flex; justify-content:space-between; margin-top:1.5rem; flex-wrap:wrap; gap:1rem;">
-      <button type="button" class="btn outline-dark" onclick="setMode('dashboard')">⬅ กลับหน้ารายการ</button>
+      <button type="button" class="btn outline-dark" onclick="setMode('dashboard')">⬅ Back to Projects</button>
       <div style="display:flex; gap:.6rem;">
-        <button type="button" class="btn success" onclick="saveCurrentSurvey(true)">💾 บันทึกข้อมูล</button>
+        <button type="button" class="btn success" onclick="saveCurrentSurvey(true)">💾 Save Survey</button>
         <button type="button" class="btn primary" onclick="exportPDF()">🖨 Export PDF</button>
       </div>
     </div>
@@ -254,42 +255,42 @@
 
   <!-- ================= LIGHTBOX ================= -->
   <div class="lightbox" id="lightbox" hidden>
-    <button class="lb-close" onclick="closeLightbox()" title="ปิด">✕</button>
-    <button class="lb-nav lb-prev" onclick="navLightbox(-1)" title="ก่อนหน้า">‹</button>
+    <button class="lb-close" onclick="closeLightbox()" title="Close">✕</button>
+    <button class="lb-nav lb-prev" onclick="navLightbox(-1)" title="Previous">‹</button>
     <img id="lbImg" src="" alt="Zoomed image">
     <div class="lb-cap" id="lbCap"></div>
-    <button class="lb-nav lb-next" onclick="navLightbox(1)" title="ถัดไป">›</button>
+    <button class="lb-nav lb-next" onclick="navLightbox(1)" title="Next">›</button>
   </div>
 
   <!-- ================= CLOUD DATABASE CONFIG MODAL ================= -->
   <div class="modal-overlay" id="cloudModal" hidden>
     <div class="modal-box">
       <div class="modal-head">
-        <h3>☁️ ตั้งค่าเชื่อมต่อ Cloud Database (Firebase)</h3>
+        <h3>☁️ Cloud Database Settings (Firebase)</h3>
         <button class="icon-del" onclick="closeCloudModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p>เชื่อมต่อฐานข้อมูลออนไลน์ฟรี เพื่อให้ทุกคนในทีมและหัวหน้ามองเห็นข้อมูลโครงการเดียวกันและแก้ไขต่อได้แบบ Real-time:</p>
+        <p>Connect to Firebase Realtime Database for instant multi-device synchronization across all team members:</p>
         
         <div class="field" style="margin-top:1rem;">
-          <label class="flabel">วางโค้ด Firebase Config (JSON หรือ JavaScript object):</label>
+          <label class="flabel">Firebase Config (JSON or JS Object):</label>
           <textarea id="firebaseConfigInput" style="font-family:monospace; font-size:.8rem; min-height:130px;" placeholder='{
   "apiKey": "AIzaSy...",
   "authDomain": "your-app.firebaseapp.com",
   "databaseURL": "https://your-app-default-rtdb.firebaseio.com",
   "projectId": "your-app",
-  "storageBucket": "your-app.appspot.com",
+  "storageBucket": "your-app.firebasestorage.app",
   "messagingSenderId": "...",
   "appId": "..."
 }'></textarea>
         </div>
         <p style="font-size:.76rem; color:var(--ink-soft); margin:.3rem 0 0;">
-          💡 คุณสามารถใส่ในไฟล์ <code>js/config.js</code> หรือวางในกล่องนี้แล้วกดบันทึกได้เลย
+          💡 You can configure this in <code>js/config.js</code> or paste here and click Save.
         </p>
       </div>
       <div class="modal-foot">
-        <button class="btn danger" onclick="clearFirebaseConfig()">ล้างการเชื่อมต่อ</button>
-        <button class="btn primary" onclick="saveFirebaseConfig()">💾 บันทึกและเชื่อมต่อ</button>
+        <button class="btn danger" onclick="clearFirebaseConfig()">Disconnect Cloud</button>
+        <button class="btn primary" onclick="saveFirebaseConfig()">💾 Save &amp; Connect</button>
       </div>
     </div>
   </div>
@@ -298,25 +299,25 @@
   <div class="modal-overlay" id="backupModal" hidden>
     <div class="modal-box">
       <div class="modal-head">
-        <h3>🔄 สำรองข้อมูล &amp; ถ่ายโอนข้อมูล</h3>
+        <h3>🔄 Backup &amp; Data Transfer</h3>
         <button class="icon-del" onclick="closeBackupModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p>ดาวน์โหลดข้อมูลโครงการทั้งหมดเป็นไฟล์สำรอง (.json) หรือนำเข้าข้อมูลจากเครื่องอื่น:</p>
+        <p>Export all project surveys to a JSON backup file or import existing records:</p>
         <div style="display:flex; flex-direction:column; gap:.8rem; margin-top:1rem;">
-          <button class="btn primary" onclick="exportAllData()">📤 ดาวน์โหลดไฟล์สำรองข้อมูลทั้งหมด (.json)</button>
-          <button class="btn outline-dark" onclick="triggerImportAll()">📥 นำเข้าข้อมูลสำรอง (.json)</button>
+          <button class="btn primary" onclick="exportAllData()">📤 Export All Surveys (.json)</button>
+          <button class="btn outline-dark" onclick="triggerImportAll()">📥 Import Backup (.json)</button>
           <input type="file" id="importFileInput" accept="application/json" hidden onchange="handleImportAll(event)">
         </div>
       </div>
       <div class="modal-foot">
-        <button class="btn outline-dark" onclick="closeBackupModal()">ปิด</button>
+        <button class="btn outline-dark" onclick="closeBackupModal()">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Toast Notification -->
-  <div id="statusToast">บันทึกสำเร็จ</div>
+  <div id="statusToast">Saved successfully</div>
 
   <!-- Application Scripts -->
   <script src="js/config.js"></script>

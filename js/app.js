@@ -1,18 +1,29 @@
 /**
- * app.js - Application Logic for Site Survey & Project Requirement Management
+ * app.js - Application Logic for Site Survey & Project Requirement Management (English Edition)
  */
 
 /* ============================================================
-   CONFIG
+   CONFIG (Core streamlined choices)
    ============================================================ */
-const CLASSIFICATION = ["Meeting Room","Seminar Room","Auditorium","War Room","Board Room","Control Room","Town Hall","Hotel","Theatre","Education","Hospital","Restaurant","Stadium","Digital Signage","LED Wall","BGM/PA","BGM/Indoor","BGM/Outdoor","Home Theater","KTV Room","KTV Mobile Set","Room Booking"];
-const PRIORITY = ["Budget","Timeline"];
-const SYSTEM_GRADE = ["Save Budget Solutions","Standard Solutions","Premium Solutions"];
-const WARRANTY = ["1 Year","2 Years","3 Years","5 Years"];
-const YN = ["Y","N"];
-const SCOPE = ["New Room Design + Interior","Renovation + Interior","Renovation Only","Audio","Video","LED","Lighting","Control","TV","Projector","Motorized Screen","Fixed Screen","Cabinet Screen","Conference"];
-const CONFERENCE = ["Online","Offline","Hybrid"];
-const DELIVERABLES = ["BOQ","System Diagram","Layout Drawing","Presentation","TOR","AutoCAD","PDF Drawing","Perspective","As-Built"];
+const CLASSIFICATION = [
+  "Meeting Room",
+  "Board Room",
+  "Town Hall",
+  "Auditorium",
+  "Control Room",
+  "LED Wall",
+  "Digital Signage",
+  "BGM / PA",
+  "Home Theater"
+];
+
+const PRIORITY = ["Budget", "Timeline"];
+const SYSTEM_GRADE = ["Save Budget Solutions", "Standard Solutions", "Premium Solutions"];
+const WARRANTY = ["1 Year", "2 Years", "3 Years", "5 Years"];
+const YN = ["Yes", "No"];
+const SCOPE = ["New Room Design + Interior", "Renovation + Interior", "Renovation Only", "Audio", "Video", "LED", "Lighting", "Control", "TV", "Projector", "Motorized Screen", "Fixed Screen", "Conference"];
+const CONFERENCE = ["Online", "Offline", "Hybrid"];
+const DELIVERABLES = ["BOQ", "System Diagram", "Layout Drawing", "Presentation", "TOR", "AutoCAD", "PDF Drawing", "Perspective", "As-Built"];
 
 /* ============================================================
    STATE
@@ -32,7 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initTechTableDefault();
   initImageDropzone();
 
-  // Load DB and seed sample if empty
+  // Load DB and update Cloud status
   await window.db.isReady;
   updateCloudIndicator();
 
@@ -64,17 +75,14 @@ document.addEventListener("DOMContentLoaded", async () => {
    ============================================================ */
 function updateCloudIndicator() {
   const dot = document.getElementById("cloudDot");
-  const text = document.getElementById("cloudText");
   const btn = document.getElementById("cloudStatusBtn");
 
   if (window.db && window.db.isCloudEnabled) {
-    if (dot) dot.style.background = "#2f8f5b";
-    if (text) text.textContent = "☁️ เชื่อมต่อ Cloud แล้ว (ซิงค์ทุกเครื่อง)";
-    if (btn) btn.innerHTML = "☁️ Cloud ออนไลน์ ✓";
+    if (dot) dot.className = "cloud-dot connected";
+    if (btn) btn.title = "Cloud Database Connected (Real-time sync active)";
   } else {
-    if (dot) dot.style.background = "#9aa3af";
-    if (text) text.textContent = "💻 โหมดบันทึกในเครื่อง";
-    if (btn) btn.innerHTML = "☁️ ตั้งค่า Cloud";
+    if (dot) dot.className = "cloud-dot";
+    if (btn) btn.title = "Local storage mode (Click to setup Cloud Database)";
   }
 }
 
@@ -96,34 +104,32 @@ function closeCloudModal() {
 function saveFirebaseConfig() {
   const val = document.getElementById("firebaseConfigInput").value.trim();
   if (!val) {
-    alert("กรุณาวางโค้ด Firebase Config");
+    alert("Please enter Firebase Config");
     return;
   }
   try {
     let cleanJson = val;
-    // Extract JSON if user pasted javascript object
     if (val.includes("const firebaseConfig =")) {
       cleanJson = val.replace(/const firebaseConfig\s*=\s*/, "").replace(/;[\s\n]*$/, "");
     }
-    // Convert unquoted keys to valid JSON if needed
     const parsed = new Function(`return ${cleanJson}`)();
     if (!parsed.apiKey || !parsed.databaseURL) {
-      alert("Config ไม่ถูกต้อง ต้องมี apiKey และ databaseURL");
+      alert("Invalid Config. Must include apiKey and databaseURL");
       return;
     }
 
     localStorage.setItem("firebase_custom_config", JSON.stringify(parsed));
-    showToast("บันทึกการตั้งค่า Cloud เรียบร้อย! กำลังรีโหลดระบบ...");
+    showToast("Cloud configuration saved. Reloading...");
     setTimeout(() => window.location.reload(), 800);
   } catch (err) {
-    alert("รูปแบบ Config ไม่ถูกต้อง: " + err.message);
+    alert("Config format error: " + err.message);
   }
 }
 
 function clearFirebaseConfig() {
-  if (!confirm("ต้องการยกเลิกการเชื่อมต่อ Cloud กลับมาใช้โหมดในเครื่องใช่หรือไม่?")) return;
+  if (!confirm("Are you sure you want to disconnect from Cloud Database and switch back to Local mode?")) return;
   localStorage.removeItem("firebase_custom_config");
-  showToast("ยกเลิกการเชื่อมต่อ Cloud แล้ว");
+  showToast("Cloud connection removed");
   setTimeout(() => window.location.reload(), 500);
 }
 
@@ -134,7 +140,7 @@ function buildPills(containerId, options, groupName, type) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = options.map(opt => {
-    const id = groupName + "-" + opt.replace(/[^a-zA-Z0-9ก-๙]+/g, "_");
+    const id = groupName + "-" + opt.replace(/[^a-zA-Z0-9]+/g, "_");
     return `<label class="pill"><input type="${type}" name="${groupName}" value="${escAttr(opt)}" id="${id}"><span>${escHtml(opt)}</span></label>`;
   }).join("");
 }
@@ -219,28 +225,28 @@ function filterDashboard() {
   listContainer.innerHTML = filtered.map(s => {
     const f = s.fields || {};
     const imgCount = (s.images || []).length;
-    const updatedDate = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+    const updatedDate = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
     const surveyDate = f.surveyDate ? fmtDate(f.surveyDate) : "";
 
     return `
       <tr>
         <td>
-          <span class="p-name">${escHtml(f.projectName || "โครงการไม่ได้ระบุชื่อ")}</span>
+          <span class="p-name">${escHtml(f.projectName || "Untitled Project")}</span>
           <div class="p-customer">
-            <span>🏢 ${escHtml(f.customer || "ไม่ได้ระบุลูกค้า")}</span>
+            <span>🏢 ${escHtml(f.customer || "Unspecified Client")}</span>
             ${f.siteLocation ? `<span>• 📍 ${escHtml(f.siteLocation)}</span>` : ""}
-            ${surveyDate ? `<span>• 📅 สำรวจ: ${surveyDate}</span>` : ""}
-            ${imgCount ? `<span class="badge blue">📷 ${imgCount} รูป</span>` : ""}
+            ${surveyDate ? `<span>• 📅 Survey: ${surveyDate}</span>` : ""}
+            ${imgCount ? `<span class="badge blue">📷 ${imgCount} Photo${imgCount > 1 ? 's' : ''}</span>` : ""}
           </div>
         </td>
         <td style="font-size:.82rem; color:var(--ink-soft);">${updatedDate}</td>
         <td>
           <div class="act-btns">
-            <button class="btn small primary" title="เปิดดูและแก้ไขต่อ" onclick="editSurvey('${s.id}')">✏️ แก้ไขต่อ</button>
-            <button class="btn small outline-dark" title="ดูเอกสารแบบทางการ" onclick="previewSurvey('${s.id}')">👁 พรีวิว</button>
-            <button class="btn small outline-dark" title="พิมพ์เป็น PDF" onclick="printSurvey('${s.id}')">🖨 PDF</button>
-            <button class="btn small outline-dark" title="คัดลอกสร้างใหม่" onclick="duplicateSurvey('${s.id}')">📋 โคลน</button>
-            <button class="btn small danger" title="ลบแบบสำรวจ" onclick="deleteSurvey('${s.id}')">🗑</button>
+            <button class="btn small primary" title="Open and edit survey" onclick="editSurvey('${s.id}')">✏️ Edit</button>
+            <button class="btn small outline-dark" title="Preview formal document" onclick="previewSurvey('${s.id}')">👁 Preview</button>
+            <button class="btn small outline-dark" title="Export PDF" onclick="printSurvey('${s.id}')">🖨 PDF</button>
+            <button class="btn small outline-dark" title="Duplicate survey" onclick="duplicateSurvey('${s.id}')">📋 Clone</button>
+            <button class="btn small danger" title="Delete survey" onclick="deleteSurvey('${s.id}')">🗑</button>
           </div>
         </td>
       </tr>
@@ -252,13 +258,13 @@ async function createNewSurvey() {
   currentSurveyId = null;
   clearFormInputs();
   setMode("edit");
-  showToast("เปิดแบบฟอร์มใหม่พร้อมกรอกข้อมูล");
+  showToast("New survey form ready");
 }
 
 async function editSurvey(id) {
   const survey = await window.db.getById(id);
   if (!survey) {
-    alert("ไม่พบข้อมูลโครงการนี้");
+    alert("Project not found");
     return;
   }
   currentSurveyId = id;
@@ -280,16 +286,16 @@ async function printSurvey(id) {
 }
 
 async function duplicateSurvey(id) {
-  if (!confirm("ต้องการคัดลอกโครงการนี้เพื่อสร้างแบบสำรวจใหม่ใช่หรือไม่?")) return;
+  if (!confirm("Do you want to duplicate this project survey?")) return;
   await window.db.duplicate(id);
-  showToast("คัดลอกโครงการเรียบร้อยแล้ว");
+  showToast("Project duplicated successfully");
   await renderDashboard();
 }
 
 async function deleteSurvey(id) {
-  if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบแบบสำรวจนี้?")) return;
+  if (!confirm("Are you sure you want to delete this survey?")) return;
   await window.db.delete(id);
-  showToast("ลบโครงการเรียบร้อย");
+  showToast("Survey deleted");
   await renderDashboard();
 }
 
@@ -301,17 +307,17 @@ function addTechRow(data) {
   const tbody = document.getElementById("techBody");
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td><input type="text" class="tr-req" placeholder="เช่น Acoustic Interior" value="${escAttr(data.req)}"></td>
-    <td><input type="text" class="tr-use" placeholder="เช่น ลดเสียงสะท้อน" value="${escAttr(data.use)}"></td>
-    <td><input type="text" class="tr-eq" placeholder="เช่น อุปกรณ์เดิม" value="${escAttr(data.eq)}"></td>
-    <td class="del"><button type="button" class="icon-del" title="ลบแถว" onclick="this.closest('tr').remove(); scheduleAutosave();">✕</button></td>`;
+    <td><input type="text" class="tr-req" placeholder="e.g. Acoustic Treatment" value="${escAttr(data.req)}"></td>
+    <td><input type="text" class="tr-use" placeholder="e.g. Reduce echo RT60 < 0.8s" value="${escAttr(data.use)}"></td>
+    <td><input type="text" class="tr-eq" placeholder="e.g. Existing wall panel" value="${escAttr(data.eq)}"></td>
+    <td class="del"><button type="button" class="icon-del" title="Remove row" onclick="this.closest('tr').remove(); scheduleAutosave();">✕</button></td>`;
   tbody.appendChild(tr);
 }
 
 function initTechTableDefault() {
   const tbody = document.getElementById("techBody");
   tbody.innerHTML = "";
-  ["Acoustic Interior", "Change equipment – Grading station", "Change equipment – Content review station", "", ""].forEach(r => addTechRow({ req: r, use: "", eq: "" }));
+  ["Acoustic Treatment", "Display Upgrade", "Audio & Microphone System", "", ""].forEach(r => addTechRow({ req: r, use: "", eq: "" }));
 }
 
 function collectTechRows() {
@@ -390,10 +396,10 @@ function renderGallery() {
       <div class="thumb-wrap" onclick="openLightbox(${i})">
         <img src="${im.dataUrl}" alt="">
         <div class="thumb-tools">
-          <button type="button" title="ลบ" onclick="event.stopPropagation(); removeImage('${im.id}')">✕</button>
+          <button type="button" title="Delete" onclick="event.stopPropagation(); removeImage('${im.id}')">✕</button>
         </div>
       </div>
-      <input class="cap-input" placeholder="คำอธิบายรูป..." value="${escAttr(im.caption)}" oninput="updateCaption('${im.id}', this.value)">
+      <input class="cap-input" placeholder="Photo caption..." value="${escAttr(im.caption)}" oninput="updateCaption('${im.id}', this.value)">
     </div>`).join("");
 }
 
@@ -505,7 +511,7 @@ async function saveCurrentSurvey(showToastMsg = true) {
   const saved = await window.db.save(data);
   currentSurveyId = saved.id;
   if (showToastMsg) {
-    showToast("💾 บันทึกข้อมูลเรียบร้อย");
+    showToast("💾 Survey saved successfully");
   }
   return saved;
 }
@@ -532,9 +538,9 @@ document.getElementById("editView").addEventListener("change", scheduleAutosave)
 function esc(s) { return (s === undefined || s === null) ? "" : String(s); }
 function escHtml(s) { return esc(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 function escAttr(s) { return esc(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-function fmtDate(s) { if (!s) return ""; const d = new Date(s + "T00:00:00"); if (isNaN(d)) return s; return d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); }
+function fmtDate(s) { if (!s) return ""; const d = new Date(s + "T00:00:00"); if (isNaN(d)) return s; return d.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" }); }
 function kv(label, val) { return `<div class="kv"><b>${escHtml(label)}:</b>${val ? escHtml(val) : '<span class="doc-empty">—</span>'}</div>`; }
-function chips(list) { return (list && list.length) ? list.map(v => `<span class="chip-tag">${escHtml(v)}</span>`).join("") : '<span class="doc-empty">ไม่ได้ระบุ</span>'; }
+function chips(list) { return (list && list.length) ? list.map(v => `<span class="chip-tag">${escHtml(v)}</span>`).join("") : '<span class="doc-empty">Not specified</span>'; }
 
 function buildDocHTML(d) {
   const f = d.fields || {};
@@ -549,7 +555,7 @@ function buildDocHTML(d) {
   return `
   <div class="doc-title">
     <h1>Site Survey &amp; Project Requirement Form</h1>
-    <p>${f.projectName ? escHtml(f.projectName) : "ยังไม่ระบุชื่อโครงการ"} • อัปเดตล่าสุด ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</p>
+    <p>${f.projectName ? escHtml(f.projectName) : "Untitled Project"} • Generated on ${new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })}</p>
   </div>
   <div style="padding:1rem 1.2rem 0;">
     <table class="doc-meta">
@@ -592,7 +598,7 @@ function buildDocHTML(d) {
     ${f.siteConstraints ? kv("Site Constraints", f.siteConstraints) : ""}
     <div style="margin-top:.7rem;">
       <b style="font-size:.78rem; color:var(--ink-soft); text-transform:uppercase;">Reference Drawings / Photos Attached</b>
-      ${(d.images && d.images.length) ? `<div class="doc-gallery">${gallery}</div>` : '<div class="doc-empty" style="margin-top:.3rem;">ไม่มีรูปแนบ</div>'}
+      ${(d.images && d.images.length) ? `<div class="doc-gallery">${gallery}</div>` : '<div class="doc-empty" style="margin-top:.3rem;">No photos attached</div>'}
     </div>
   </div>
 
@@ -602,7 +608,7 @@ function buildDocHTML(d) {
       <table class="doc-table">
         <thead><tr><th>Requirement</th><th>Use Case</th><th>Existing Equipment</th></tr></thead>
         <tbody>${techRows.map(r => `<tr><td>${escHtml(r.req) || "—"}</td><td>${escHtml(r.use) || "—"}</td><td>${escHtml(r.eq) || "—"}</td></tr>`).join("")}</tbody>
-      </table>` : '<div class="doc-empty">ไม่มีข้อมูล</div>'}
+      </table>` : '<div class="doc-empty">No technical requirements specified</div>'}
   </div>
 
   <div class="doc-section">
@@ -619,7 +625,7 @@ function buildDocHTML(d) {
 
   <div class="doc-section">
     <h3><span class="n">7</span>Site Constraint &amp; Risk</h3>
-    <p style="font-size:.85rem; white-space:pre-wrap;">${f.siteRisk ? escHtml(f.siteRisk) : '<span class="doc-empty">ไม่มีข้อมูล</span>'}</p>
+    <p style="font-size:.85rem; white-space:pre-wrap;">${f.siteRisk ? escHtml(f.siteRisk) : '<span class="doc-empty">No constraints or risks recorded</span>'}</p>
   </div>
 
   <div class="doc-section">
@@ -631,7 +637,7 @@ function buildDocHTML(d) {
     </div>
   </div>
 
-  <div class="report-footer">Site Survey &amp; Project Requirement Form — generated ${new Date().toLocaleString("th-TH")}</div>
+  <div class="report-footer">Site Survey &amp; Project Requirement Form — generated ${new Date().toLocaleString("en-GB")}</div>
   `;
 }
 
@@ -648,7 +654,7 @@ function exportPDF() {
 function downloadReport() {
   const data = collectData();
   const inner = buildDocHTML(data);
-  const projectName = (data.fields.projectName || "site-survey").trim().replace(/[^a-zA-Z0-9ก-๙_-]+/g, "_") || "site-survey";
+  const projectName = (data.fields.projectName || "site-survey").trim().replace(/[^a-zA-Z0-9_-]+/g, "_") || "site-survey";
   
   const styleText = [...document.styleSheets].map(sheet => {
     try {
@@ -657,7 +663,7 @@ function downloadReport() {
   }).join("\n");
 
   const html = `<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Site Survey Report - ${escHtml(data.fields.projectName || "")}</title>
 <style>${styleText}</style>
 <style>
@@ -668,19 +674,19 @@ function downloadReport() {
   @media print{ .report-toolbar{display:none;} }
 </style>
 </head><body>
-<div class="report-toolbar"><button onclick="window.print()">🖨 พิมพ์ / บันทึกเป็น PDF</button></div>
+<div class="report-toolbar"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
 <main class="sheet" id="previewView"><div class="doc" id="docOutput">${inner}</div></main>
 </body></html>`;
 
   downloadBlob(html, `${projectName}_survey_report.html`, "text/html");
-  showToast("ดาวน์โหลดรายงาน HTML สำเร็จ");
+  showToast("HTML Report downloaded successfully");
 }
 
 function downloadCurrentDraftJSON() {
   const data = collectData();
-  const name = (data.fields.projectName || "draft").trim().replace(/[^a-zA-Z0-9ก-๙_-]+/g, "_") || "draft";
+  const name = (data.fields.projectName || "draft").trim().replace(/[^a-zA-Z0-9_-]+/g, "_") || "draft";
   downloadBlob(JSON.stringify(data, null, 2), `${name}_draft.json`, "application/json");
-  showToast("บันทึกไฟล์ JSON สำเร็จ");
+  showToast("JSON draft saved");
 }
 
 function downloadBlob(content, filename, type) {
@@ -709,7 +715,7 @@ async function exportAllData() {
   const json = await window.db.exportAll();
   const dateStr = new Date().toISOString().slice(0, 10);
   downloadBlob(json, `site_surveys_backup_${dateStr}.json`, "application/json");
-  showToast("สำรองข้อมูลทั้งหมดเรียบร้อยแล้ว");
+  showToast("All data backed up successfully");
 }
 
 function triggerImportAll() {
@@ -724,11 +730,11 @@ async function handleImportAll(event) {
   reader.onload = async (e) => {
     try {
       const count = await window.db.importAll(e.target.result);
-      showToast(`นำเข้าข้อมูลเรียบร้อย ${count} โครงการ`);
+      showToast(`Imported ${count} project(s) successfully`);
       closeBackupModal();
       await renderDashboard();
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการนำเข้าไฟล์: " + err.message);
+      alert("Error importing data: " + err.message);
     }
   };
   reader.readAsText(file);
